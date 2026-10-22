@@ -1,0 +1,17 @@
+# 싹둑 (ssakduk)
+
+> 무료 녹음·영상 자동 분할 도구. 긴 녹음이나 영상을 정해진 최대 길이(기본 5분) 이하로 자르되, 그 직전 가장 조용한 순간에서 잘라 말이 끊기지 않게 합니다. 재압축 없이 잘라 음질·화질 손실이 없습니다. 무료, 광고 없음, 회원가입 없음, 파일은 서버로 업로드되지 않습니다.
+>
+> Free tool that splits long audio/video recordings into pieces of at most N minutes, cutting at the quietest moment so speech isn't chopped. Lossless (stream copy). No signup, no ads, no uploads — everything runs on the user's device.
+
+## Ways to use it
+
+- [Online version](https://iamandykim9.github.io/ssakduk/): runs in the browser (ffmpeg.wasm). Drop files, set max length and search range, download pieces as a zip. Best for files up to about 1 GB.
+- [Offline version for Windows](https://github.com/iamandykim9/ssakduk/releases/latest/download/Ssakduk-Windows.zip): desktop app, no install, no size limit in practice.
+- [Command line / AI agents](https://github.com/iamandykim9/ssakduk/blob/main/skills/ssakduk/SKILL.md): `pip install "git+https://github.com/iamandykim9/ssakduk"` then `ssakduk FILE --max 5 --json`. Requires ffmpeg. Windows without Python: `ssakduk-cli.exe` from the latest release.
+
+## Details
+
+- [Source code (GPL-3.0)](https://github.com/iamandykim9/ssakduk)
+- Settings: max length (minutes), quiet-point search range (seconds, default 30), for video: keep video or extract audio only.
+- Output names: `name_01.ext`, `name_02.ext`, …

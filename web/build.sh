@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 npm install --no-audit --no-fund --silent
 OUT="${1:-../_site}"
 rm -rf "$OUT" && mkdir -p "$OUT/vendor/ffmpeg" "$OUT/vendor/core"
-cp index.html app.js style.css icon.svg sitemap.xml google*.html "$OUT/"
+cp index.html app.js style.css icon.svg sitemap.xml llms.txt google*.html "$OUT/"
 cp node_modules/@ffmpeg/ffmpeg/dist/esm/*.js "$OUT/vendor/ffmpeg/"
 cp node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm "$OUT/vendor/core/"
 cp node_modules/fflate/esm/browser.js "$OUT/vendor/fflate.js"

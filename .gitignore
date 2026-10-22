@@ -6,3 +6,4 @@ dist/
 ffmpeg.exe
 ffmpeg.zip
 ffmpeg_dl/
+*.egg-info/

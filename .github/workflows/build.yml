@@ -3,7 +3,7 @@ name: Offline version (Windows zip)
 on:
   push:
     branches: [main]
-    paths-ignore: ["web/**", ".github/workflows/pages.yml", "README.md"]
+    paths-ignore: ["web/**", ".github/workflows/pages.yml", "README.md", "AGENTS.md", "skills/**"]
   workflow_dispatch:
 
 permissions:
@@ -65,17 +65,40 @@ jobs:
           }
           Remove-Item -Recurse "테스트 녹음_분할", "test_분할", "테스트 영상_분할"
 
+      - name: Test command-line version (pip install)
+        shell: pwsh
+        run: |
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8   # 한글 경로를 그대로 받기
+          $env:Path = "$PWD;$env:Path"   # 테스트용으로 받은 ffmpeg.exe를 쓰게
+          pip install .
+          ssakduk --version
+          ssakduk "테스트 녹음.m4a" --out cli_out --json -q | Out-File -Encoding utf8 cli.json
+          $r = Get-Content cli.json -Raw -Encoding utf8 | ConvertFrom-Json
+          if (-not $r.ok -or $r.results[0].count -ne 3) { Get-Content cli.json; throw "cli test failed" }
+          foreach ($p in $r.results[0].pieces) { if (-not (Test-Path -LiteralPath $p.path)) { throw "missing $($p.path)" } }
+          ssakduk nope.m4a -q; if ($LASTEXITCODE -ne 1) { throw "expected exit 1" }
+          $global:LASTEXITCODE = 0
+          Remove-Item -Recurse cli_out, cli.json
+
       - name: Build exe
-        run: pyinstaller --noconfirm --onefile --windowed --name Ssakduk --icon icon.ico --add-data "icon.ico;." --collect-all tkinterdnd2 --add-binary "ffmpeg.exe;." app.py
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name Ssakduk --icon icon.ico --add-data "icon.ico;." --collect-all tkinterdnd2 --add-binary "ffmpeg.exe;." app.py
+          pyinstaller --noconfirm --onefile --console --name ssakduk-cli --icon icon.ico --add-binary "ffmpeg.exe;." ssakduk_cli.py
 
       - name: Test built exe
         shell: pwsh
         run: |
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
           Remove-Item ffmpeg.exe   # exe 안에 묶인 ffmpeg를 쓰는지 확인
           $p = Start-Process -FilePath dist\Ssakduk.exe -ArgumentList '--cli','--log','exe_log.txt','test.mp3' -Wait -PassThru
           Get-Content exe_log.txt
           if ($p.ExitCode -ne 0) { throw "exe test failed" }
           if (-not (Select-String -Path exe_log.txt -Pattern '^OK ')) { throw "exe did not split" }
+          $env:Path = ($env:Path -split ';' | Where-Object { $_ -notmatch 'ffmpeg|hostedtoolcache\\Python' }) -join ';'
+          .\dist\ssakduk-cli.exe test.mp3 --out exe_cli_out --json -q | Out-File -Encoding utf8 exe_cli.json
+          $r = Get-Content exe_cli.json -Raw -Encoding utf8 | ConvertFrom-Json
+          if (-not $r.ok -or $r.results[0].count -ne 3) { Get-Content exe_cli.json; throw "cli exe test failed" }
+          "ffmpeg used by cli exe is bundled: OK"
 
       - name: Make zip
         shell: pwsh
@@ -93,5 +116,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes --cleanup-tag 2>$null
-          $notes = "싹둑 오프라인 버전 (Windows 10/11, 64비트)`n`nSsakduk-Windows.zip 을 받아 압축을 풀고 Ssakduk.exe 를 실행하세요. 설치·회원가입 필요 없음.`n`n빌드: ${{ github.sha }}"
-          gh release create latest Ssakduk-Windows.zip --title "싹둑 오프라인 버전 (최신)" --notes $notes --latest
+          $notes = "싹둑 오프라인 버전 (Windows 10/11, 64비트)`n`nSsakduk-Windows.zip 을 받아 압축을 풀고 Ssakduk.exe 를 실행하세요. 설치·회원가입 필요 없음.`n`nssakduk-cli.exe: 명령어·AI 도구용 (사용법: https://github.com/iamandykim9/ssakduk/blob/main/skills/ssakduk/SKILL.md)`n`n빌드: ${{ github.sha }}"
+          gh release create latest Ssakduk-Windows.zip dist/ssakduk-cli.exe --title "싹둑 오프라인 버전 (최신)" --notes $notes --latest

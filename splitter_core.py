@@ -157,8 +157,19 @@ def keyframe_cut(energy, smooth, w, start, kfs):
 # ---------- 전체 처리 ----------
 def split_file(path, max_seg=300.0, search=30.0, subfolder=True, audio_only=False,
                ffmpeg=None, log=print, progress=lambda f: None):
-    """path 파일을 자른다. (결과 폴더, 조각 수)를 돌려준다.
+    """path 파일을 자른다. (결과 폴더, 조각 수)를 돌려준다. (화면 버전용)"""
+    r = split(path, max_seg=max_seg, search=search, subfolder=subfolder,
+              audio_only=audio_only, ffmpeg=ffmpeg, log=log, progress=progress)
+    return r["output_dir"], r["count"]
+
+
+def split(path, max_seg=300.0, search=30.0, subfolder=True, audio_only=False,
+          out_dir=None, dry_run=False, ffmpeg=None, log=print, progress=lambda f: None):
+    """path 파일을 자르고 결과를 dict로 돌려준다.
+    max_seg: 조각 최대 길이(초), search: 조용한 곳을 찾는 범위(초)
     audio_only: 영상 파일이면 소리만 뽑아서 자른다.
+    out_dir: 결과 폴더를 직접 지정 (없으면 원본 옆, subfolder면 '원본이름_분할')
+    dry_run: 분할 지점만 계산하고 파일은 만들지 않는다.
     log(str): 진행 메시지, progress(0~1): 이 파일의 진행률"""
     ffmpeg = ffmpeg or find_ffmpeg()
     if not ffmpeg:
@@ -180,17 +191,17 @@ def split_file(path, max_seg=300.0, search=30.0, subfolder=True, audio_only=Fals
     if keep_video:
         maps = ["-map", "0:v:0", "-map", "0:a?"]
         out_ext = ext
-        kind = "영상"
+        kind, mode = "영상", "video"
     elif info["has_video"]:            # 영상에서 소리만
         maps = ["-map", "0:a:0"]
         out_ext = AUDIO_COPY_EXT.get(info["acodec"])
         if not out_ext:
             out_ext, reencode_audio = ".m4a", True
-        kind = "소리만"
+        kind, mode = "소리만", "audio_only"
     else:                              # 원래 오디오 파일
         maps = ["-map", "0:a:0"]
         out_ext = ext
-        kind = "오디오"
+        kind, mode = "오디오", "audio"
     log(f"전체 길이 {fmt(duration)} · {kind}")
 
     expected = max(1, int(duration // max_seg))
@@ -224,7 +235,25 @@ def split_file(path, max_seg=300.0, search=30.0, subfolder=True, audio_only=Fals
 
     count = len(cuts) + 1
     digits = max(2, len(str(count)))
-    out_dir = os.path.join(folder, f"{base}_분할") if subfolder else folder
+    if out_dir:
+        out_dir = os.path.abspath(out_dir)
+    else:
+        out_dir = os.path.join(folder, f"{base}_분할") if subfolder else folder
+    bounds = [0.0] + cuts + [duration]
+    result = {
+        "input": path, "duration": round(duration, 3), "mode": mode,
+        "output_dir": out_dir, "count": count, "dry_run": bool(dry_run),
+        "pieces": [{
+            "index": i + 1,
+            "path": os.path.join(out_dir, f"{base}_{i + 1:0{digits}d}{out_ext}"),
+            "start": round(bounds[i], 3), "end": round(bounds[i + 1], 3),
+            "duration": round(bounds[i + 1] - bounds[i], 3),
+        } for i in range(count)],
+    }
+    if dry_run:
+        log(f"미리보기: {count}개 조각 (파일은 만들지 않음)")
+        progress(1.0)
+        return result
     os.makedirs(out_dir, exist_ok=True)
 
     # 같은 이름의 예전 조각 정리 (새 결과와 섞이지 않게)
@@ -255,7 +284,7 @@ def split_file(path, max_seg=300.0, search=30.0, subfolder=True, audio_only=Fals
         raise SplitError(r.stderr.decode("utf-8", "ignore").strip()[-300:])
     progress(1.0)
     log(f"완료: {count}개 파일")
-    return out_dir, count
+    return result
 
 
 def fmt(t):

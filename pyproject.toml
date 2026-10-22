@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssakduk"
+version = "1.1.0"
+description = "녹음·영상 파일을 조용한 지점에서 최대 길이 이하로 무손실 분할 (ffmpeg 필요)"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.8"
+dependencies = []
+
+[project.urls]
+Homepage = "https://iamandykim9.github.io/ssakduk/"
+Source = "https://github.com/iamandykim9/ssakduk"
+
+[project.scripts]
+ssakduk = "ssakduk_cli:main"
+
+[tool.setuptools]
+py-modules = ["splitter_core", "ssakduk_cli"]
