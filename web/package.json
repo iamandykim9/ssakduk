@@ -1,0 +1,10 @@
+{
+  "name": "ssakduk-web",
+  "private": true,
+  "description": "싹둑 온라인 버전 - 빌드 때 필요한 라이브러리 목록",
+  "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "fflate": "0.8.3"
+  }
+}

@@ -1,8 +1,9 @@
-name: Build Windows exe
+name: Offline version (Windows zip)
 
 on:
   push:
     branches: [main]
+    paths-ignore: ["web/**", ".github/workflows/pages.yml", "README.md"]
   workflow_dispatch:
 
 permissions:
@@ -40,46 +41,57 @@ jobs:
           if (-not (Test-Path ffmpeg.exe)) { throw "ffmpeg download failed" }
           .\ffmpeg.exe -version | Select-Object -First 1
 
-      - name: Make test audio (12 min, silent gap every 7 s)
+      - name: Make test media (12 min, silent gap every 7 s)
         shell: pwsh
         run: |
-          .\ffmpeg.exe -v error -y -f lavfi -i "aevalsrc='0.4*sin(2*PI*220*t)*gt(mod(t,7),1)':s=44100:d=720" -ac 2 -c:a aac -b:a 192k "테스트 녹음.m4a"
+          $a = "aevalsrc='0.4*sin(2*PI*220*t)*gt(mod(t,7),1)':s=44100:d=720"
+          .\ffmpeg.exe -v error -y -f lavfi -i $a -ac 2 -c:a aac -b:a 192k "테스트 녹음.m4a"
           .\ffmpeg.exe -v error -y -i "테스트 녹음.m4a" -c:a libmp3lame -b:a 128k test.mp3
+          .\ffmpeg.exe -v error -y -f lavfi -i testsrc=s=320x240:r=30:d=720 -f lavfi -i $a -c:v libx264 -preset ultrafast -g 60 -c:a aac -shortest "테스트 영상.mp4"
 
       - name: Test splitting logic
         shell: pwsh
         run: |
-          python app.py --cli "테스트 녹음.m4a" test.mp3
-          $n = (Get-ChildItem "테스트 녹음_분할" -Filter *.m4a).Count
-          $m = (Get-ChildItem "test_분할" -Filter *.mp3).Count
-          Write-Host "m4a pieces: $n, mp3 pieces: $m"
-          if ($n -ne 3 -or $m -ne 3) { throw "unexpected piece count" }
-          Remove-Item -Recurse "테스트 녹음_분할", "test_분할"
+          python app.py --cli "테스트 녹음.m4a" test.mp3 "테스트 영상.mp4"
+          python app.py --cli --audio-only "테스트 영상.mp4"
+          $checks = @{
+            "테스트 녹음_분할\*.m4a" = 3; "test_분할\*.mp3" = 3;
+            "테스트 영상_분할\*.mp4" = 3; "테스트 영상_분할\*.m4a" = 3
+          }
+          foreach ($k in $checks.Keys) {
+            $n = (Get-ChildItem $k).Count
+            Write-Host "$k : $n"
+            if ($n -ne $checks[$k]) { throw "unexpected piece count for $k" }
+          }
+          Remove-Item -Recurse "테스트 녹음_분할", "test_분할", "테스트 영상_분할"
 
       - name: Build exe
-        run: pyinstaller --noconfirm --onefile --windowed --name AudioSplitter --collect-all tkinterdnd2 --add-binary "ffmpeg.exe;." app.py
+        run: pyinstaller --noconfirm --onefile --windowed --name Ssakduk --icon icon.ico --add-data "icon.ico;." --collect-all tkinterdnd2 --add-binary "ffmpeg.exe;." app.py
 
       - name: Test built exe
         shell: pwsh
         run: |
           Remove-Item ffmpeg.exe   # exe 안에 묶인 ffmpeg를 쓰는지 확인
-          $p = Start-Process -FilePath dist\AudioSplitter.exe -ArgumentList '--cli','--log','exe_log.txt','test.mp3' -Wait -PassThru
+          $p = Start-Process -FilePath dist\Ssakduk.exe -ArgumentList '--cli','--log','exe_log.txt','test.mp3' -Wait -PassThru
           Get-Content exe_log.txt
           if ($p.ExitCode -ne 0) { throw "exe test failed" }
           if (-not (Select-String -Path exe_log.txt -Pattern '^OK ')) { throw "exe did not split" }
-          (Get-Item dist\AudioSplitter.exe).Length / 1MB
+
+      - name: Make zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory pkg | Out-Null
+          Copy-Item dist\Ssakduk.exe pkg\
+          Copy-Item OFFLINE_README.txt "pkg\사용법.txt"
+          Copy-Item LICENSE pkg\LICENSE.txt
+          Compress-Archive -Path pkg\* -DestinationPath Ssakduk-Windows.zip -CompressionLevel Optimal
+          "{0:N1} MB" -f ((Get-Item Ssakduk-Windows.zip).Length / 1MB)
 
       - name: Publish release
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes --cleanup-tag 2>$null
-          $notes = "AudioSplitter.exe 를 내려받아 실행하세요. 설치 필요 없음.`n`n빌드: ${{ github.sha }}"
-          gh release create latest dist/AudioSplitter.exe --title "녹음 파일 분할기 (최신)" --notes $notes --latest
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: AudioSplitter
-          path: dist/AudioSplitter.exe
+          $notes = "싹둑 오프라인 버전 (Windows 10/11, 64비트)`n`nSsakduk-Windows.zip 을 받아 압축을 풀고 Ssakduk.exe 를 실행하세요. 설치·회원가입 필요 없음.`n`n빌드: ${{ github.sha }}"
+          gh release create latest Ssakduk-Windows.zip --title "싹둑 오프라인 버전 (최신)" --notes $notes --latest

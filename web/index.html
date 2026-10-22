@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>싹둑 | 무료 녹음·영상 자동 분할 — 회원가입·설치 없이</title>
+<meta name="description" content="긴 녹음 파일과 영상을 원하는 길이로, 말이 끊기지 않는 조용한 지점에서 자동으로 잘라줍니다. 무료, 광고 없음, 회원가입 없음. 파일은 서버로 올라가지 않고 내 컴퓨터에서 처리됩니다.">
+<meta property="og:title" content="싹둑 | 무료 녹음·영상 자동 분할">
+<meta property="og:description" content="녹음·영상을 조용한 지점에서 원하는 길이로 자동 분할. 무료·광고 없음·회원가입 없음.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#1f5c4d">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="./"><img src="icon.svg" alt="" width="28" height="28"> 싹둑</a>
+    <nav><a href="#offline">오프라인 버전</a><a href="#faq">자주 묻는 질문</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>긴 녹음, <span>말 안 끊기게</span> 싹둑.</h1>
+    <p class="lead">녹음·영상 파일을 원하는 길이로 나눠 드려요. 정해진 시간에서 그냥 자르지 않고, 그 직전 가장 조용한 순간을 찾아서 자릅니다.</p>
+    <ul class="badges">
+      <li>완전 무료</li><li>광고 없음</li><li>회원가입 없음</li><li>파일이 서버로 안 올라감</li>
+    </ul>
+  </section>
+
+  <section class="tool" aria-label="파일 자르기">
+    <label id="drop" class="drop" tabindex="0">
+      <input id="pick" type="file" multiple accept="audio/*,video/*,.m4a,.mp3,.wav,.flac,.aac,.ogg,.opus,.wma,.mp4,.mov,.mkv,.webm,.avi">
+      <strong>녹음·영상 파일을 여기에 끌어다 놓으세요</strong>
+      <span>또는 눌러서 선택 · m4a, mp3, wav, mp4, mov 등</span>
+    </label>
+
+    <div class="opts">
+      <label class="opt">최대 길이
+        <span class="num"><input id="maxMin" type="number" min="1" max="120" step="1" value="5"> 분</span>
+      </label>
+      <label class="opt">조용한 곳 찾는 범위
+        <span class="num"><input id="searchSec" type="number" min="0" max="120" step="5" value="30"> 초</span>
+      </label>
+      <fieldset class="opt">
+        <legend>영상 파일은</legend>
+        <label class="radio"><input type="radio" name="vmode" value="keep" checked> 영상 그대로</label>
+        <label class="radio"><input type="radio" name="vmode" value="audio"> 소리만 뽑아서</label>
+      </fieldset>
+    </div>
+    <p id="hint" class="hint"></p>
+
+    <ul id="list" class="list"></ul>
+
+    <div class="actions">
+      <button id="clear" class="ghost" type="button">목록 비우기</button>
+      <button id="start" class="primary" type="button" disabled>자르기 시작</button>
+    </div>
+    <p id="engine" class="engine"></p>
+  </section>
+
+  <section id="offline" class="offline">
+    <div>
+      <h2>오프라인 버전 (Windows)</h2>
+      <p>인터넷 없이 쓰고 싶거나, 몇 GB짜리 큰 영상을 자를 때는 오프라인 버전이 빠르고 안정적이에요. 설치 없이 압축만 풀고 실행하면 됩니다.</p>
+      <ul class="small">
+        <li>Windows 10 / 11, 64비트</li>
+        <li>처음 실행할 때 "Windows의 PC 보호" 창이 뜨면 <b>추가 정보 → 실행</b>을 누르세요. 개인이 만든 무료 프로그램이라 유료 인증서가 없어서 뜨는 안내예요.</li>
+      </ul>
+    </div>
+    <a class="primary big" href="https://github.com/iamandykim9/ssakduk/releases/latest/download/Ssakduk-Windows.zip">오프라인 버전 받기 (zip)</a>
+  </section>
+
+  <section id="faq" class="faq">
+    <h2>자주 묻는 질문</h2>
+    <details><summary>정말 무료인가요? 나중에 돈 내야 하나요?</summary>
+      <p>완전 무료이고 앞으로도 그래요. 광고도, 회원가입도, 사용 횟수 제한도 없습니다.</p></details>
+    <details><summary>제 파일이 어딘가에 올라가나요?</summary>
+      <p>아니요. 온라인 버전도 파일을 서버로 보내지 않고, 지금 쓰는 브라우저 안에서 내 컴퓨터로 처리해요. 그래서 인터넷이 느려도 파일 크기만큼 기다릴 필요가 없습니다.</p></details>
+    <details><summary>음질이나 화질이 떨어지나요?</summary>
+      <p>아니요. 다시 압축하지 않고 원본 데이터를 그대로 나눠 담기 때문에 손실이 없어요. 조각 용량을 다 합치면 원본과 거의 같습니다.</p></details>
+    <details><summary>왜 조각 길이가 딱 5분이 아니에요?</summary>
+      <p>말이나 소리가 중간에 끊기지 않게, 최대 길이 직전 범위(기본 30초) 안에서 가장 조용한 순간을 골라 자르기 때문이에요. 조각은 정한 최대 길이를 넘지 않습니다. 범위를 0초로 하면 정확히 그 시간에서 자릅니다.</p></details>
+    <details><summary>영상은 어떻게 잘리나요?</summary>
+      <p>"영상 그대로"는 화질 손실 없이 자르기 위해 영상의 키프레임(보통 1~2초마다 있음) 중 가장 조용한 지점에서 자릅니다. "소리만 뽑아서"는 영상에서 오디오만 꺼내 m4a 등으로 자르니 용량이 훨씬 작아요.</p></details>
+    <details><summary>큰 파일도 되나요?</summary>
+      <p>온라인 버전은 브라우저 메모리 한도 때문에 파일 하나에 1GB 안팎까지 권장해요. 그보다 큰 영상은 오프라인 버전을 쓰세요. 오프라인 버전은 크기 제한이 사실상 없습니다.</p></details>
+    <details><summary>휴대폰에서도 되나요?</summary>
+      <p>최신 브라우저라면 동작하지만 휴대폰은 메모리가 작아 큰 파일은 실패할 수 있어요. PC 사용을 권장합니다.</p></details>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>싹둑은 오픈소스 프로그램입니다 · <a href="https://github.com/iamandykim9/ssakduk">소스 코드</a> · GPL-3.0</p>
+    <p>파일 처리에 <a href="https://ffmpeg.org">FFmpeg</a>(GPL)와 <a href="https://github.com/ffmpegwasm/ffmpeg.wasm">ffmpeg.wasm</a>을 사용합니다.</p>
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

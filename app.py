@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""녹음 파일 분할기 - 화면(UI)"""
+"""싹둑 - 녹음·영상 자동 분할기 (오프라인 버전 화면)"""
 
+import json
 import os
 import queue
 import subprocess
@@ -18,7 +19,9 @@ try:
 except Exception:
     HAS_DND = False
 
-APP_NAME = "녹음 파일 분할기"
+APP_NAME = "싹둑"
+SETTINGS = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"),
+                        "Ssakduk", "settings.json")
 FONT = "Malgun Gothic" if os.name == "nt" else "TkDefaultFont"
 
 C_BG = "#f6f5f2"
@@ -48,8 +51,13 @@ class App:
         self.last_dir = None
         self.ffmpeg = core.find_ffmpeg()
 
-        root.title(APP_NAME)
-        root.geometry("640x620")
+        root.title(f"{APP_NAME} — 무료 녹음·영상 자동 분할")
+        try:
+            base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+            root.iconbitmap(os.path.join(base, "icon.ico"))
+        except Exception:
+            pass
+        root.geometry("660x660")
         root.minsize(520, 520)
         root.configure(bg=C_BG)
 
@@ -82,14 +90,14 @@ class App:
         outer.pack(fill="both", expand=True)
 
         ttk.Label(outer, text=APP_NAME, style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="조용한 지점을 찾아 정해진 길이 이하로 자릅니다. 음질 손실 없음.",
+        ttk.Label(outer, text="녹음·영상을 조용한 지점에서 정해진 길이 이하로 자릅니다. 음질·화질 손실 없음.",
                   style="Muted.TLabel").pack(anchor="w", pady=(2, 12))
 
         # 드롭 영역
         self.drop = tk.Label(
             outer, bg=C_DROP, fg=C_ACCENT, cursor="hand2", font=(FONT, 11),
-            text=("여기에 녹음 파일을 끌어다 놓으세요\n또는 클릭해서 선택"
-                  if HAS_DND else "클릭해서 녹음 파일 선택"),
+            text=("여기에 녹음·영상 파일을 끌어다 놓으세요\n또는 클릭해서 선택"
+                  if HAS_DND else "클릭해서 녹음·영상 파일 선택"),
             height=4, highlightthickness=1, highlightbackground="#b9d0c7")
         self.drop.pack(fill="x")
         self.drop.bind("<Button-1>", lambda e: self.pick())
@@ -116,9 +124,11 @@ class App:
         # 설정
         opt = ttk.Frame(outer)
         opt.pack(fill="x", pady=(12, 0))
-        self.v_max = tk.DoubleVar(value=5)
-        self.v_search = tk.IntVar(value=30)
-        self.v_sub = tk.BooleanVar(value=True)
+        cfg = self.load_settings()
+        self.v_max = tk.DoubleVar(value=cfg.get("max_min", 5))
+        self.v_search = tk.IntVar(value=cfg.get("search_sec", 30))
+        self.v_sub = tk.BooleanVar(value=cfg.get("subfolder", True))
+        self.v_audio = tk.BooleanVar(value=cfg.get("audio_only", False))
         ttk.Label(opt, text="최대 길이").pack(side="left")
         ttk.Spinbox(opt, from_=1, to=120, increment=1, width=4,
                     textvariable=self.v_max).pack(side="left", padx=(6, 2))
@@ -127,8 +137,15 @@ class App:
         ttk.Spinbox(opt, from_=0, to=120, increment=5, width=4,
                     textvariable=self.v_search).pack(side="left", padx=(6, 2))
         ttk.Label(opt, text="초").pack(side="left", padx=(0, 16))
-        ttk.Checkbutton(opt, text="'_분할' 폴더에 모아 저장",
-                        variable=self.v_sub).pack(side="left")
+        opt2 = ttk.Frame(outer)
+        opt2.pack(fill="x", pady=(8, 0))
+        ttk.Label(opt2, text="영상 파일은").pack(side="left")
+        ttk.Radiobutton(opt2, text="영상 그대로 자르기", value=False,
+                        variable=self.v_audio).pack(side="left", padx=(8, 0))
+        ttk.Radiobutton(opt2, text="소리만 뽑아서 자르기", value=True,
+                        variable=self.v_audio).pack(side="left", padx=(8, 16))
+        ttk.Checkbutton(opt2, text="'_분할' 폴더에 모아 저장",
+                        variable=self.v_sub).pack(side="right")
 
         # 진행
         self.bar = ttk.Progressbar(outer, mode="determinate", maximum=1.0)
@@ -166,10 +183,10 @@ class App:
     def pick(self):
         if self.busy:
             return
-        exts = " ".join("*" + e for e in sorted(core.AUDIO_EXTS))
+        exts = " ".join("*" + e for e in sorted(core.MEDIA_EXTS))
         files = filedialog.askopenfilenames(
-            title="자를 녹음 파일 선택",
-            filetypes=[("오디오 파일", exts), ("모든 파일", "*.*")])
+            title="자를 녹음·영상 파일 선택",
+            filetypes=[("녹음·영상 파일", exts), ("모든 파일", "*.*")])
         self.add_paths(files)
 
     def on_drop(self, event):
@@ -181,7 +198,7 @@ class App:
         for p in paths:
             if os.path.isdir(p):
                 sub = [os.path.join(p, f) for f in sorted(os.listdir(p))
-                       if os.path.splitext(f)[1].lower() in core.AUDIO_EXTS]
+                       if os.path.splitext(f)[1].lower() in core.MEDIA_EXTS]
             else:
                 sub = [p]
             for f in sub:
@@ -214,6 +231,23 @@ class App:
         if self.last_dir and os.path.isdir(self.last_dir):
             open_folder(self.last_dir)
 
+    def load_settings(self):
+        try:
+            with open(SETTINGS, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save_settings(self):
+        try:
+            os.makedirs(os.path.dirname(SETTINGS), exist_ok=True)
+            with open(SETTINGS, "w", encoding="utf-8") as f:
+                json.dump({"max_min": self.v_max.get(), "search_sec": self.v_search.get(),
+                           "subfolder": self.v_sub.get(),
+                           "audio_only": self.v_audio.get()}, f)
+        except Exception:
+            pass
+
     def log(self, text):
         self.log_box.config(state="normal")
         self.log_box.insert("end", text + "\n")
@@ -238,15 +272,16 @@ class App:
         if max_seg < 60:
             messagebox.showerror(APP_NAME, "최대 길이는 1분 이상이어야 합니다.")
             return
+        self.save_settings()
         self.busy = True
         for b in (self.b_start, self.b_clear, self.b_open):
             b.config(state="disabled")
         jobs = [(iid, self.items[iid]) for iid in todo]
         threading.Thread(target=self.worker,
-                         args=(jobs, max_seg, search, self.v_sub.get()),
+                         args=(jobs, max_seg, search, self.v_sub.get(), self.v_audio.get()),
                          daemon=True).start()
 
-    def worker(self, jobs, max_seg, search, subfolder):
+    def worker(self, jobs, max_seg, search, subfolder, audio_only):
         total = len(jobs)
         ok = 0
         for n, (iid, path) in enumerate(jobs):
@@ -258,12 +293,11 @@ class App:
                 self.q.put(("bar", (n + f) / total))
 
             try:
-                out_dir = core.split_file(
+                out_dir, count = core.split_file(
                     path, max_seg=max_seg, search=search, subfolder=subfolder,
+                    audio_only=audio_only,
                     ffmpeg=self.ffmpeg, log=lambda s: self.q.put(("log", "   " + s)),
                     progress=prog)
-                count = sum(1 for f in os.listdir(out_dir)
-                            if f.startswith(os.path.splitext(os.path.basename(path))[0] + "_"))
                 self.q.put(("row", iid, f"완료 · {count}개 ({time.time() - t0:.0f}초)"))
                 self.q.put(("dir", out_dir))
                 ok += 1
@@ -320,10 +354,11 @@ def cli(args):
 
     log(f"ffmpeg: {core.find_ffmpeg()}")
     code = 0
-    for p in args:
+    for p in [a for a in args if not a.startswith("--")]:
         try:
-            d = core.split_file(p, log=log)
-            log(f"OK {d}")
+            ao = "--audio-only" in sys.argv
+            d, n = core.split_file(p, log=log, audio_only=ao)
+            log(f"OK {n} {d}")
         except Exception as e:
             log(f"FAIL {p}: {e}")
             code = 1
