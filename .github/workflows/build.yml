@@ -110,11 +110,23 @@ jobs:
           Compress-Archive -Path pkg\* -DestinationPath Ssakduk-Windows.zip -CompressionLevel Optimal
           "{0:N1} MB" -f ((Get-Item Ssakduk-Windows.zip).Length / 1MB)
 
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Copy-Item dist\ssakduk-cli.exe ssakduk-cli.exe
+          $lines = foreach ($f in 'Ssakduk-Windows.zip', 'ssakduk-cli.exe') {
+            "{0}  {1}" -f (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(), $f
+          }
+          [IO.File]::WriteAllText("$PWD\SHA256SUMS.txt", ($lines -join "`n") + "`n")
+          Get-Content SHA256SUMS.txt
+
       - name: Publish release
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $sums = (Get-Content SHA256SUMS.txt) -join "`n"
           gh release delete latest --yes --cleanup-tag 2>$null
-          $notes = "싹둑 오프라인 버전 (Windows 10/11, 64비트)`n`nSsakduk-Windows.zip 을 받아 압축을 풀고 Ssakduk.exe 를 실행하세요. 설치·회원가입 필요 없음.`n`nssakduk-cli.exe: 명령어·AI 도구용 (사용법: https://github.com/iamandykim9/ssakduk/blob/main/skills/ssakduk/SKILL.md)`n`n빌드: ${{ github.sha }}"
-          gh release create latest Ssakduk-Windows.zip dist/ssakduk-cli.exe --title "싹둑 오프라인 버전 (최신)" --notes $notes --latest
+          $fence = '```'
+          $notes = "싹둑 오프라인 버전 (Windows 10/11, 64비트)`n`nSsakduk-Windows.zip 을 받아 압축을 풀고 Ssakduk.exe 를 실행하세요. 설치·회원가입 필요 없음.`n`nssakduk-cli.exe: 명령어·AI 도구용 (사용법: https://github.com/iamandykim9/ssakduk/blob/main/skills/ssakduk/SKILL.md)`n`nSHA-256 (받은 파일이 진짜인지 확인용, SHA256SUMS.txt 와 같음):`n$fence`n$sums`n$fence`n`n빌드: ${{ github.sha }}"
+          gh release create latest Ssakduk-Windows.zip ssakduk-cli.exe SHA256SUMS.txt --title "싹둑 오프라인 버전 (최신)" --notes $notes --latest

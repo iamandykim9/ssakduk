@@ -23,8 +23,21 @@ uvx --from "git+https://github.com/iamandykim9/ssakduk" ssakduk --help
 
 ffmpeg: `winget install Gyan.FFmpeg` (Windows) · `brew install ffmpeg` (macOS) · `sudo apt install ffmpeg` (Debian/Ubuntu).
 
-Windows without Python: download `ssakduk-cli.exe` from
-https://github.com/iamandykim9/ssakduk/releases/latest — ffmpeg is bundled, use it exactly like `ssakduk`.
+Windows without Python: use `ssakduk-cli.exe` (ffmpeg bundled, same options as `ssakduk`).
+Download it **only** from the official release and verify its SHA-256 before running:
+
+```powershell
+$base = "https://github.com/iamandykim9/ssakduk/releases/latest/download"
+Invoke-WebRequest "$base/ssakduk-cli.exe" -OutFile ssakduk-cli.exe
+Invoke-WebRequest "$base/SHA256SUMS.txt"  -OutFile SHA256SUMS.txt
+$expected = ((Select-String -Path SHA256SUMS.txt -Pattern 'ssakduk-cli\.exe').Line -split '\s+')[0]
+$actual   = (Get-FileHash ssakduk-cli.exe -Algorithm SHA256).Hash.ToLower()
+if ($actual -ne $expected) { Remove-Item ssakduk-cli.exe; throw "SHA-256 mismatch: do not run this file" }
+.\ssakduk-cli.exe --version
+```
+
+On macOS/Linux the equivalent check is `sha256sum -c SHA256SUMS.txt --ignore-missing`.
+If the hashes don't match, stop and tell the user instead of running the file.
 
 ## Usage
 
