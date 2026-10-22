@@ -1,0 +1,85 @@
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install pyinstaller tkinterdnd2
+
+      - name: Download ffmpeg
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $urls = @(
+            'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip',
+            'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+          )
+          foreach ($u in $urls) {
+            try {
+              Invoke-WebRequest $u -OutFile ffmpeg.zip
+              Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_dl -Force
+              $exe = Get-ChildItem ffmpeg_dl -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+              if ($exe) { Copy-Item $exe.FullName ffmpeg.exe; break }
+            } catch { Write-Host "failed: $u" }
+          }
+          if (-not (Test-Path ffmpeg.exe)) { throw "ffmpeg download failed" }
+          .\ffmpeg.exe -version | Select-Object -First 1
+
+      - name: Make test audio (12 min, silent gap every 7 s)
+        shell: pwsh
+        run: |
+          .\ffmpeg.exe -v error -y -f lavfi -i "aevalsrc='0.4*sin(2*PI*220*t)*gt(mod(t,7),1)':s=44100:d=720" -ac 2 -c:a aac -b:a 192k "테스트 녹음.m4a"
+          .\ffmpeg.exe -v error -y -i "테스트 녹음.m4a" -c:a libmp3lame -b:a 128k test.mp3
+
+      - name: Test splitting logic
+        shell: pwsh
+        run: |
+          python app.py --cli "테스트 녹음.m4a" test.mp3
+          $n = (Get-ChildItem "테스트 녹음_분할" -Filter *.m4a).Count
+          $m = (Get-ChildItem "test_분할" -Filter *.mp3).Count
+          Write-Host "m4a pieces: $n, mp3 pieces: $m"
+          if ($n -ne 3 -or $m -ne 3) { throw "unexpected piece count" }
+          Remove-Item -Recurse "테스트 녹음_분할", "test_분할"
+
+      - name: Build exe
+        run: pyinstaller --noconfirm --onefile --windowed --name AudioSplitter --collect-all tkinterdnd2 --add-binary "ffmpeg.exe;." app.py
+
+      - name: Test built exe
+        shell: pwsh
+        run: |
+          Remove-Item ffmpeg.exe   # exe 안에 묶인 ffmpeg를 쓰는지 확인
+          $p = Start-Process -FilePath dist\AudioSplitter.exe -ArgumentList '--cli','--log','exe_log.txt','test.mp3' -Wait -PassThru
+          Get-Content exe_log.txt
+          if ($p.ExitCode -ne 0) { throw "exe test failed" }
+          if (-not (Select-String -Path exe_log.txt -Pattern '^OK ')) { throw "exe did not split" }
+          (Get-Item dist\AudioSplitter.exe).Length / 1MB
+
+      - name: Publish release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>$null
+          $notes = "AudioSplitter.exe 를 내려받아 실행하세요. 설치 필요 없음.`n`n빌드: ${{ github.sha }}"
+          gh release create latest dist/AudioSplitter.exe --title "녹음 파일 분할기 (최신)" --notes $notes --latest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AudioSplitter
+          path: dist/AudioSplitter.exe
